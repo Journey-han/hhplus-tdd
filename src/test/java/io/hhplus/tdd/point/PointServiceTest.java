@@ -2,8 +2,11 @@ package io.hhplus.tdd.point;
 
 import io.hhplus.tdd.database.PointHistoryTable;
 import io.hhplus.tdd.database.UserPointTable;
+import io.hhplus.tdd.point.domain.PointHistory;
+import io.hhplus.tdd.point.domain.TransactionType;
+import io.hhplus.tdd.point.domain.UserPoint;
 import io.hhplus.tdd.point.service.PointService;
-import org.apache.catalina.User;
+import io.hhplus.tdd.point.util.PointValidator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -26,6 +29,9 @@ public class PointServiceTest {
 
     @InjectMocks
     private PointService pointService;      // 실제 테스트할 대상 주입
+
+    @Mock
+    private PointValidator pointValidator;
 
     @BeforeEach
     void setUp() {
@@ -109,5 +115,53 @@ public class PointServiceTest {
         assertEquals(mockUserPoint, resultUserPoint);
         verify(userPointTable, times(1)).insertOrUpdate(userId, amount);
 
+    }
+
+    @Test
+    @DisplayName("잔고가 부족했을 때")
+    void testUserPointException_failPoint() {
+        // Given
+        long currentAmount = 500L;      // 현재 잔고
+        long amount = 1000L;            // 사용할 금액
+
+        // When
+        Exception exception = assertThrows(IllegalArgumentException.class, () -> {
+            pointValidator.validateUse(currentAmount, amount);
+        });
+
+        // Then
+        assertEquals("잔고가 부족합니다.", exception.getMessage());
+    }
+
+    @Test
+    @DisplayName("충전 금액이 최소 충전 금액보다 작을 때")
+    void testUserPointException_MinAmount() {
+        // Given
+        long currentAmount = 50000L;    // 현재 잔고
+        long amount = 10L;              // 충전할 금액
+
+        // When
+        Exception exception = assertThrows(IllegalArgumentException.class, () -> {
+            pointValidator.validateCharge(currentAmount, amount);  // 최소 충전 금액은 100
+        });
+
+        // Then
+        assertEquals("최소 충전금액은 100포인트 이상입니다.", exception.getMessage());
+    }
+
+    @Test
+    @DisplayName("최대 잔고를 초과했을 때")
+    void testUserPointException_MaxPoint() {
+        // Given
+        long currentAmount = 99999L;        // 현재 잔고
+        long amount = 1000L;                // 충전 금액
+
+        // When
+        Exception exception = assertThrows(IllegalArgumentException.class, () -> {
+            pointValidator.validateCharge(currentAmount, amount);  // 최대 잔고는 100,000
+        });
+
+        // Then
+        assertEquals("최대 잔고를 초과할 수 없습니다.", exception.getMessage());
     }
 }
